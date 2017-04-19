@@ -1,23 +1,29 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <mpi.h>
 #include <math.h>
 
-#define COL 4
-#define LIN 4
+#define COL 10
+#define LIN 10
 
-void quickSort( int[], int, int);
-int partition( int[], int, int);
+int saco_de_trabalho[LIN][COL];
 
-main(int argc, char** argv){
+int cmpfunc (const void * a, const void * b)
+{
+   return ( *(int*)a - *(int*)b );
+}
+
+void main(int argc, char** argv){
 	int my_rank;       // Identificador deste processo
   	int proc_n;        // Numero de processos disparados pelo usuario na linha de comando (np)  
   	int message[10];   // Buffer para as mensagens                    
-  	MPI_Status status; // estrutura que guarda o estado de retorno          
+  	MPI_Status status; // estrutura que guarda o estado de retorno
+  	MPI_Status status2; // estrutura que guarda o estado de retorno          
   	MPI_Init(&argc , &argv); // funcao que inicializa o MPI, todo o codigo paralelo estah abaixo
   	MPI_Comm_rank(MPI_COMM_WORLD, &my_rank); // pega pega o numero do processo atual (rank)
   	MPI_Comm_size(MPI_COMM_WORLD, &proc_n);  // pega informacao do numero de processos (quantidade total)
-	int saco_de_trabalho[LIN][COL];
+	//int saco_de_trabalho[LIN][COL];
 	int resp[10];
 	int f[proc_n];
 	int v[10];
@@ -40,7 +46,7 @@ main(int argc, char** argv){
 		int j;
 		for(i=0;i<LIN;i++){
 			for(j=0;j<COL;j++){
-				saco_de_trabalho[i][j] = rand() % 10;
+				saco_de_trabalho[i][j] = (i+1) * (COL-j);
 			}
 		}
 
@@ -53,24 +59,42 @@ main(int argc, char** argv){
 			printf("\n");
 		}
 		
-		int y;
+		int y=1;
 		int count = 0;
 		int pid_slave;
 
 		//Envia todos
 		for(y=1;y<proc_n;y++){
-			MPI_Send(&saco_de_trabalho[y-1], COL, MPI_INT, y, 1, MPI_COMM_WORLD);
+			MPI_Send(&saco_de_trabalho[y-1], COL, MPI_INT, y, y, MPI_COMM_WORLD);
 		}
 		
 		//Recebe e reenvia mais
 		//for(y=1;y<=LIN;y++){
-		while(count<COL-1){
-			MPI_Recv(&resp, COL, MPI_INT, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
+		//y = 1;
+		while(count<COL){
+			MPI_Probe(MPI_ANY_SOURCE,MPI_ANY_TAG,MPI_COMM_WORLD, &status2);
+			printf("\n TAG %d c %d y %d \n\n",status2.MPI_TAG,count,y);
+			MPI_Recv(saco_de_trabalho[status2.MPI_TAG-1], COL, MPI_INT, status2.MPI_SOURCE, status2.MPI_TAG, MPI_COMM_WORLD, &status);
+			
+			if(count<COL) MPI_Send(&saco_de_trabalho[y-1], COL, MPI_INT, status.MPI_SOURCE, y, MPI_COMM_WORLD);
+			y++;
 			count++;
-			saco_de_trabalho[count][0] = &resp;
-			if(count<COL) MPI_Send(&saco_de_trabalho[count], COL, MPI_INT, status.MPI_SOURCE, 1, MPI_COMM_WORLD);
 		}
 		
+		/*
+		MPI_Probe(MPI_ANY_SOURCE,MPI_ANY_TAG,MPI_COMM_WORLD, &status);
+			
+		MPI_Recv(saco_de_trabalho[status.MPI_TAG-1], COL, MPI_INT, status.MPI_SOURCE, status.MPI_TAG, MPI_COMM_WORLD, &status);
+		count++;
+		if(count<COL) MPI_Send(&saco_de_trabalho[count], COL, MPI_INT, status.MPI_SOURCE, y, MPI_COMM_WORLD);
+		y++;*/
+
+		
+
+		//Mata todos
+		for(y=1;y<proc_n;y++){
+			MPI_Send(&saco_de_trabalho[0], COL, MPI_INT, y, 0, MPI_COMM_WORLD);
+		}
 
 		//printa matriz		
 		printf("[M] RESULTADO -----------------------\n");
@@ -79,11 +103,6 @@ main(int argc, char** argv){
 				printf("[%d] ",saco_de_trabalho[i][j]);
 			}
 			printf("\n");
-		}
-
-		//Mata todos
-		for(y=1;y<proc_n;y++){
-			MPI_Send(&saco_de_trabalho[0], COL, MPI_INT, y, 0, MPI_COMM_WORLD);
 		}
 
 
@@ -98,59 +117,24 @@ main(int argc, char** argv){
 		while(1){
 			MPI_Recv(&v, COL, MPI_INT, 0, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
 
-			if(status.MPI_TAG == 1){
+			if(status.MPI_TAG >= 1){
 				
-				int s;
+				/*int s;
 				for(s=0;s<COL;s++){
 					printf("[E] [%d] ",v[s]);
-				}printf("\n");
+				}printf("\n");*/
 
-				//quickSort( v, 0, COL-1);
+				qsort(&v,COL,sizeof(int),cmpfunc);
 
-				MPI_Send(&v, COL, MPI_INT, 0, 1, MPI_COMM_WORLD);
+				MPI_Send(&v, COL, MPI_INT, 0, status.MPI_TAG, MPI_COMM_WORLD);
 				
-				printf("[E] Escravo terminou %d\n",my_rank);
+				//printf("[E] Escravo terminou %d\n",my_rank);
 			}else{
 				break;
 			}
 		}
-		printf("[E] Escravo se matando %d.\n",my_rank);
+		//printf("[E] Escravo se matando %d.\n",my_rank);
 		MPI_Finalize();
-	}
-
-	
-
-	
+	}	
 }
 
-void quickSort( int a[], int l, int r)
-{
-   int j;
-
-   if( l < r ) 
-   {
-   	// divide and conquer
-        j = partition( a, l, r);
-       quickSort( a, l, j-1);
-       quickSort( a, j+1, r);
-   }
-	
-}
-
-
-
-int partition( int a[], int l, int r) {
-   int pivot, i, j, t;
-   pivot = a[l];
-   i = l; j = r+1;
-		
-   while( 1)
-   {
-   	do ++i; while( a[i] <= pivot && i <= r );
-   	do --j; while( a[j] > pivot );
-   	if( i >= j ) break;
-   	t = a[i]; a[i] = a[j]; a[j] = t;
-   }
-   t = a[l]; a[l] = a[j]; a[j] = t;
-   return j;
-}
