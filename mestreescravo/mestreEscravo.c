@@ -4,10 +4,10 @@
 #include <mpi.h>
 #include <math.h>
 
-#define COL 10
-#define LIN 10
+#define COL 100
+#define LIN 100
 
-int saco_de_trabalho[LIN][COL];
+//int saco_de_trabalho[LIN][COL];
 
 int cmpfunc (const void * a, const void * b)
 {
@@ -26,9 +26,7 @@ void main(int argc, char** argv){
 	//int saco_de_trabalho[LIN][COL];
 	int resp[10];
 	int f[proc_n];
-	int v[10];
-
-	
+	int *v =  (int*)malloc(COL*sizeof(int));
 
 	double t1,t2;
 	t1 = MPI_Wtime();  // inicia a contagem do tempo
@@ -40,24 +38,35 @@ void main(int argc, char** argv){
 		for(x=0;x<proc_n;x++){
 			f[x] = 0;
 		}
+
+		int **saco_de_trabalho = (int**)malloc(LIN*sizeof(int*));
+		int i,j;
 		
+		printf("Preenchendo...\n");
+		for (i=0 ; i<LIN; i++){              
+			saco_de_trabalho[i] = (int*)malloc(COL*sizeof(int));
+			for (j=0 ; j<COL; j++){
+				saco_de_trabalho[i][j] = COL-j;
+			}
+		}
+
 		//Popula saco de trabalho
-		int i;
+		/*int i;
 		int j;
 		for(i=0;i<LIN;i++){
 			for(j=0;j<COL;j++){
 				saco_de_trabalho[i][j] = (i+1) * (COL-j);
 			}
-		}
+		}*/
 
 		//printa matriz		
-		printf("[M]\n");
+		/*printf("[M]\n");
 		for(i=0;i<LIN;i++){
 			for(j=0;j<COL;j++){
 				printf("[%d] ",saco_de_trabalho[i][j]);
 			}
 			printf("\n");
-		}
+		}*/
 		
 		int y=1;
 		int count = 0;
@@ -73,7 +82,7 @@ void main(int argc, char** argv){
 		//y = 1;
 		while(count<COL){
 			MPI_Probe(MPI_ANY_SOURCE,MPI_ANY_TAG,MPI_COMM_WORLD, &status2);
-			printf("\n TAG %d c %d y %d \n\n",status2.MPI_TAG,count,y);
+			//printf("\n TAG %d c %d y %d \n\n",status2.MPI_TAG,count,y);
 			MPI_Recv(saco_de_trabalho[status2.MPI_TAG-1], COL, MPI_INT, status2.MPI_SOURCE, status2.MPI_TAG, MPI_COMM_WORLD, &status);
 			
 			if(count<COL) MPI_Send(&saco_de_trabalho[y-1], COL, MPI_INT, status.MPI_SOURCE, y, MPI_COMM_WORLD);
@@ -97,13 +106,13 @@ void main(int argc, char** argv){
 		}
 
 		//printa matriz		
-		printf("[M] RESULTADO -----------------------\n");
+		/*printf("[M] RESULTADO -----------------------\n");
 		for(i=0;i<LIN;i++){
 			for(j=0;j<COL;j++){
 				printf("[%d] ",saco_de_trabalho[i][j]);
 			}
 			printf("\n");
-		}
+		}*/
 
 
 		t2 = MPI_Wtime(); // termina a contagem do tempo
@@ -112,7 +121,7 @@ void main(int argc, char** argv){
 		
 
 	}else{ //ESCRAVO
-		printf("[E] sou o Escravo, Pid: %d  \n",my_rank);
+		//printf("[E] sou o Escravo, Pid: %d  \n",my_rank);
 
 		while(1){
 			MPI_Recv(&v, COL, MPI_INT, 0, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
