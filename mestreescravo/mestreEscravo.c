@@ -4,8 +4,8 @@
 #include <mpi.h>
 #include <math.h>
 
-#define COL 100
-#define LIN 100
+#define COL 10
+#define LIN 10
 
 //int saco_de_trabalho[LIN][COL];
 
@@ -23,7 +23,7 @@ void main(int argc, char** argv){
   	MPI_Init(&argc , &argv); // funcao que inicializa o MPI, todo o codigo paralelo estah abaixo
   	MPI_Comm_rank(MPI_COMM_WORLD, &my_rank); // pega pega o numero do processo atual (rank)
   	MPI_Comm_size(MPI_COMM_WORLD, &proc_n);  // pega informacao do numero de processos (quantidade total)
-	//int saco_de_trabalho[LIN][COL];
+	int saco_de_trabalho[LIN][COL];
 	int resp[10];
 	int f[proc_n];
 	int *v =  (int*)malloc(COL*sizeof(int));
@@ -39,55 +39,63 @@ void main(int argc, char** argv){
 			f[x] = 0;
 		}
 
-		int **saco_de_trabalho = (int**)malloc(LIN*sizeof(int*));
-		int i,j;
+		//int **saco_de_trabalho = (int**)malloc(LIN*sizeof(int*));
+		//int i,j;
 		
 		printf("Preenchendo...\n");
-		for (i=0 ; i<LIN; i++){              
+		/*for (i=0 ; i<LIN; i++){              
 			saco_de_trabalho[i] = (int*)malloc(COL*sizeof(int));
 			for (j=0 ; j<COL; j++){
 				saco_de_trabalho[i][j] = COL-j;
 			}
-		}
+		}*/
 
 		//Popula saco de trabalho
-		/*int i;
+		int i;
 		int j;
 		for(i=0;i<LIN;i++){
 			for(j=0;j<COL;j++){
 				saco_de_trabalho[i][j] = (i+1) * (COL-j);
 			}
-		}*/
+		}
 
 		//printa matriz		
-		/*printf("[M]\n");
+		printf("[M]\n");
 		for(i=0;i<LIN;i++){
 			for(j=0;j<COL;j++){
 				printf("[%d] ",saco_de_trabalho[i][j]);
 			}
 			printf("\n");
-		}*/
+		}
 		
-		int y=1;
+		int order=1;
 		int count = 0;
 		int pid_slave;
 
 		//Envia todos
-		for(y=1;y<proc_n;y++){
-			MPI_Send(&saco_de_trabalho[y-1], COL, MPI_INT, y, y, MPI_COMM_WORLD);
+		for(order=1;order<proc_n;order++){
+			MPI_Send(&saco_de_trabalho[order-1], COL, MPI_INT, order, order, MPI_COMM_WORLD);
 		}
 		
 		//Recebe e reenvia mais
 		//for(y=1;y<=LIN;y++){
-		//y = 1;
-		while(count<COL){
+		int y;
+		int tag = 0;
+		while(count<COL && order <= COL+proc_n-1){
 			MPI_Probe(MPI_ANY_SOURCE,MPI_ANY_TAG,MPI_COMM_WORLD, &status2);
-			//printf("\n TAG %d c %d y %d \n\n",status2.MPI_TAG,count,y);
-			MPI_Recv(saco_de_trabalho[status2.MPI_TAG-1], COL, MPI_INT, status2.MPI_SOURCE, status2.MPI_TAG, MPI_COMM_WORLD, &status);
-			
-			if(count<COL) MPI_Send(&saco_de_trabalho[y-1], COL, MPI_INT, status.MPI_SOURCE, y, MPI_COMM_WORLD);
-			y++;
-			count++;
+			tag = (int)(status2.MPI_TAG);
+			printf("[M] TAG RECV %d\n",tag);
+			if(tag != 0){
+				printf("\n TAG %d c %d order %d \n\n",tag,count,order);
+				MPI_Recv(saco_de_trabalho[tag-1], COL, MPI_INT, MPI_ANY_SOURCE, tag, MPI_COMM_WORLD, &status);
+				
+				if(count<COL && order <= COL) {
+					MPI_Send(&saco_de_trabalho[order-1], COL, MPI_INT, status.MPI_SOURCE, order, MPI_COMM_WORLD);
+					printf("[M] SEND order %d\n",order);
+				}
+				order++;
+				count++;
+			}
 		}
 		
 		/*
@@ -106,13 +114,13 @@ void main(int argc, char** argv){
 		}
 
 		//printa matriz		
-		/*printf("[M] RESULTADO -----------------------\n");
+		printf("[M] RESULTADO -----------------------\n");
 		for(i=0;i<LIN;i++){
 			for(j=0;j<COL;j++){
 				printf("[%d] ",saco_de_trabalho[i][j]);
 			}
 			printf("\n");
-		}*/
+		}
 
 
 		t2 = MPI_Wtime(); // termina a contagem do tempo
@@ -125,7 +133,7 @@ void main(int argc, char** argv){
 
 		while(1){
 			MPI_Recv(&v, COL, MPI_INT, 0, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
-
+			printf("[E] tag: %d\n",status.MPI_TAG);
 			if(status.MPI_TAG >= 1){
 				
 				/*int s;
