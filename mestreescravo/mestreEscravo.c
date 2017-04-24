@@ -4,8 +4,8 @@
 #include <mpi.h>
 #include <math.h>
 
-#define COL 10
-#define LIN 10
+#define COL 10000
+#define LIN 10000
 
 //int saco_de_trabalho[LIN][COL];
 
@@ -23,7 +23,7 @@ void main(int argc, char** argv){
   	MPI_Init(&argc , &argv); // funcao que inicializa o MPI, todo o codigo paralelo estah abaixo
   	MPI_Comm_rank(MPI_COMM_WORLD, &my_rank); // pega pega o numero do processo atual (rank)
   	MPI_Comm_size(MPI_COMM_WORLD, &proc_n);  // pega informacao do numero de processos (quantidade total)
-	int saco_de_trabalho[LIN][COL];
+	//int saco_de_trabalho[LIN][COL];
 	int resp[10];
 	int f[proc_n];
 	int *v =  (int*)malloc(COL*sizeof(int));
@@ -34,39 +34,36 @@ void main(int argc, char** argv){
 	if( my_rank == 0 ){ //MESTRE
 		printf("[M] sou o Mestre\n\n");
 
-		int x;
-		for(x=0;x<proc_n;x++){
-			f[x] = 0;
-		}
-
-		//int **saco_de_trabalho = (int**)malloc(LIN*sizeof(int*));
-		//int i,j;
+		int **saco_de_trabalho = (int**)malloc(LIN*sizeof(int*));
+		int i,j;
 		
 		printf("Preenchendo...\n");
-		/*for (i=0 ; i<LIN; i++){              
+		for (i=0 ; i<LIN; i++){              
 			saco_de_trabalho[i] = (int*)malloc(COL*sizeof(int));
 			for (j=0 ; j<COL; j++){
 				saco_de_trabalho[i][j] = COL-j;
 			}
-		}*/
+		}
+
+		printf("Ordenando...\n");
 
 		//Popula saco de trabalho
-		int i;
-		int j;
-		for(i=0;i<LIN;i++){
-			for(j=0;j<COL;j++){
-				saco_de_trabalho[i][j] = (i+1) * (COL-j);
-			}
-		}
+		// int i;
+		// int j;
+		// for(i=0;i<LIN;i++){
+		// 	for(j=0;j<COL;j++){
+		// 		saco_de_trabalho[i][j] = (i+1) * (COL-j);
+		// 	}
+		// }
 
 		//printa matriz		
-		printf("[M]\n");
-		for(i=0;i<LIN;i++){
-			for(j=0;j<COL;j++){
-				printf("[%d] ",saco_de_trabalho[i][j]);
-			}
-			printf("\n");
-		}
+		// printf("[M]\n");
+		// for(i=0;i<LIN;i++){
+		// 	for(j=0;j<COL;j++){
+		// 		printf("[%d] ",saco_de_trabalho[i][j]);
+		// 	}
+		// 	printf("\n");
+		// }
 		
 		int order=1;
 		int count = 0;
@@ -74,29 +71,33 @@ void main(int argc, char** argv){
 
 		//Envia todos
 		for(order=1;order<proc_n;order++){
-			MPI_Send(&saco_de_trabalho[order-1], COL, MPI_INT, order, order, MPI_COMM_WORLD);
+			MPI_Send(saco_de_trabalho[order-1], COL, MPI_INT, order, order, MPI_COMM_WORLD);
 		}
 		
 		//Recebe e reenvia mais
 		//for(y=1;y<=LIN;y++){
 		int y;
 		int tag = 0;
+		int source;
 		while(count<COL && order <= COL+proc_n-1){
 			MPI_Probe(MPI_ANY_SOURCE,MPI_ANY_TAG,MPI_COMM_WORLD, &status2);
 			tag = (int)(status2.MPI_TAG);
-			printf("[M] TAG RECV %d\n",tag);
-			if(tag != 0){
-				printf("\n TAG %d c %d order %d \n\n",tag,count,order);
+			
+			// printf("[M] TAG RECV %d\n",tag);
+			if(tag > 0){
+				// printf("\n [M] TAG %d c %d order %d \n\n",tag,count,order);
 				MPI_Recv(saco_de_trabalho[tag-1], COL, MPI_INT, MPI_ANY_SOURCE, tag, MPI_COMM_WORLD, &status);
-				
+				source = status.MPI_SOURCE;
 				if(count<COL && order <= COL) {
-					MPI_Send(&saco_de_trabalho[order-1], COL, MPI_INT, status.MPI_SOURCE, order, MPI_COMM_WORLD);
-					printf("[M] SEND order %d\n",order);
+					MPI_Send(saco_de_trabalho[order-1], COL, MPI_INT, source, order, MPI_COMM_WORLD);
+					// printf("[M] SEND order %d\n",order);
 				}
 				order++;
 				count++;
 			}
 		}
+
+		printf("Ordenacao pronta.\n");
 		
 		/*
 		MPI_Probe(MPI_ANY_SOURCE,MPI_ANY_TAG,MPI_COMM_WORLD, &status);
@@ -110,13 +111,15 @@ void main(int argc, char** argv){
 
 		//Mata todos
 		for(y=1;y<proc_n;y++){
-			MPI_Send(&saco_de_trabalho[0], COL, MPI_INT, y, 0, MPI_COMM_WORLD);
+			MPI_Send(saco_de_trabalho[0], 1, MPI_INT, y, 0, MPI_COMM_WORLD);
 		}
 
 		//printa matriz		
+		i=0;
+		j=0;
 		printf("[M] RESULTADO -----------------------\n");
-		for(i=0;i<LIN;i++){
-			for(j=0;j<COL;j++){
+		for(i=0;i<LIN/1000;i++){
+			for(j=0;j<COL/1000;j++){
 				printf("[%d] ",saco_de_trabalho[i][j]);
 			}
 			printf("\n");
@@ -130,20 +133,24 @@ void main(int argc, char** argv){
 
 	}else{ //ESCRAVO
 		//printf("[E] sou o Escravo, Pid: %d  \n",my_rank);
-
+		int tag=0;
 		while(1){
-			MPI_Recv(&v, COL, MPI_INT, 0, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
-			printf("[E] tag: %d\n",status.MPI_TAG);
-			if(status.MPI_TAG >= 1){
+			MPI_Recv(v, COL, MPI_INT, 0, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
+			tag = status.MPI_TAG;
+			// printf("[E] tag: %d\n",tag);
+			if(tag >= 1){
 				
-				/*int s;
-				for(s=0;s<COL;s++){
-					printf("[E] [%d] ",v[s]);
-				}printf("\n");*/
+				
+				qsort(v,COL,sizeof(int),cmpfunc);
 
-				qsort(&v,COL,sizeof(int),cmpfunc);
+				
+				// int s;
+				// for(s=0;s<COL;s++){
+				// 	printf("[E] [%d] ",&v[s]);
+				// }printf("\n");
 
-				MPI_Send(&v, COL, MPI_INT, 0, status.MPI_TAG, MPI_COMM_WORLD);
+				// printf("[E] SEND tag %d\n",tag);
+				MPI_Send(v, COL, MPI_INT, 0, tag, MPI_COMM_WORLD);
 				
 				//printf("[E] Escravo terminou %d\n",my_rank);
 			}else{
