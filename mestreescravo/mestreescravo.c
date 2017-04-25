@@ -4,8 +4,8 @@
 #include <mpi.h>
 #include <math.h>
 
-#define COL 10000
-#define LIN 10000
+#define COL 100000
+#define LIN 1000
 
 //int saco_de_trabalho[LIN][COL];
 
@@ -14,7 +14,7 @@ int cmpfunc (const void * a, const void * b)
    return ( *(int*)a - *(int*)b );
 }
 
-void main(int argc, char** argv){
+int main(int argc, char** argv){
 	int my_rank;       // Identificador deste processo
   	int proc_n;        // Numero de processos disparados pelo usuario na linha de comando (np)  
   	int message[10];   // Buffer para as mensagens                    
@@ -57,15 +57,15 @@ void main(int argc, char** argv){
 		// }
 
 		//printa matriz		
-		// printf("[M]\n");
-		// for(i=0;i<LIN;i++){
-		// 	for(j=0;j<COL;j++){
-		// 		printf("[%d] ",saco_de_trabalho[i][j]);
-		// 	}
-		// 	printf("\n");
-		// }
+		/* printf("[M]\n");
+		 for(i=0;i<LIN;i++){
+		 	for(j=0;j<COL;j++){
+		 		printf("[%d] ",saco_de_trabalho[i][j]);
+		 	}
+		 	printf("\n");
+		 }*/
 		
-		int order=1;
+		long order=1;
 		int count = 0;
 		int pid_slave;
 
@@ -79,7 +79,7 @@ void main(int argc, char** argv){
 		int y;
 		int tag = 0;
 		int source;
-		while(count<COL && order <= COL+proc_n-1){
+		while(count<LIN && order <= LIN+proc_n-1){
 			MPI_Probe(MPI_ANY_SOURCE,MPI_ANY_TAG,MPI_COMM_WORLD, &status2);
 			tag = (int)(status2.MPI_TAG);
 			
@@ -88,12 +88,13 @@ void main(int argc, char** argv){
 				// printf("\n [M] TAG %d c %d order %d \n\n",tag,count,order);
 				MPI_Recv(saco_de_trabalho[tag-1], COL, MPI_INT, MPI_ANY_SOURCE, tag, MPI_COMM_WORLD, &status);
 				source = status.MPI_SOURCE;
-				if(count<COL && order <= COL) {
+				if(count<LIN && order <= LIN) {
 					MPI_Send(saco_de_trabalho[order-1], COL, MPI_INT, source, order, MPI_COMM_WORLD);
 					// printf("[M] SEND order %d\n",order);
 				}
 				order++;
 				count++;
+                if(count % 50 == 0) printf(" ordenado %d\n",count);
 			}
 		}
 
@@ -117,13 +118,13 @@ void main(int argc, char** argv){
 		//printa matriz		
 		i=0;
 		j=0;
-		printf("[M] RESULTADO -----------------------\n");
-		for(i=0;i<LIN/1000;i++){
-			for(j=0;j<COL/1000;j++){
+		/*printf("[M] RESULTADO -----------------------\n");
+		for(i=0;i<LIN/100;i++){
+			for(j=0;j<COL/10000;j++){
 				printf("[%d] ",saco_de_trabalho[i][j]);
 			}
 			printf("\n");
-		}
+		}*/
 
 
 		t2 = MPI_Wtime(); // termina a contagem do tempo
@@ -160,5 +161,5 @@ void main(int argc, char** argv){
 		//printf("[E] Escravo se matando %d.\n",my_rank);
 		MPI_Finalize();
 	}	
+return 0;
 }
-
