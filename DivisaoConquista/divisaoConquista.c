@@ -5,38 +5,97 @@
 
 #define ARRAY_SIZE 100000
 
+int *interleaving(int vetor[], int tam)
+{
+    int *vetor_auxiliar;
+    int i1, i2, i_aux;
+
+    vetor_auxiliar = (int *)malloc(sizeof(int) * tam);
+
+    i1 = 0;
+    i2 = tam / 2;
+
+    for (i_aux = 0; i_aux < tam; i_aux++) {
+        if (((vetor[i1] <= vetor[i2]) && (i1 < (tam / 2))) || (i2 == tam))
+            vetor_auxiliar[i_aux] = vetor[i1++];
+        else
+            vetor_auxiliar[i_aux] = vetor[i2++];
+    }
+
+    return vetor_auxiliar;
+}
+
+/* Bubble Sort */
+void bs(int n, int * vetor)
+{
+
+    int c=0, d, troca, trocou =1;
+    // printf("Ordenando...\n");
+    while (c < (n-1) & trocou ){
+        trocou = 0;
+        for (d = 0 ; d < n - c - 1; d++)
+            if (vetor[d] > vetor[d+1]){
+                troca      = vetor[d];
+                vetor[d]   = vetor[d+1];
+                vetor[d+1] = troca;
+                trocou = 1;
+            }
+        c++;
+    }
+    // printf("Ordenado.\n\n");
+}
+
+
 int main(int argc, char** argv){
 
     int my_rank;       
     int proc_n;        
     MPI_Status status; 
-    MPI_Init();
+    MPI_Init(&argc,&argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
     MPI_Comm_size(MPI_COMM_WORLD, &proc_n);
-    int delta = 50;
+    int delta = ARRAY_SIZE / (((proc_n-1)/2) + 1); // Numero de folhas da minha arvore
 
-    /* DUVIDAS
-        A arvore vai ser sempre cheia?
-        o delta eh fixo?
+    int filhoDireita = (my_rank*2)+1;
+    int filhoEsquerda = (my_rank*2)+2;
 
-    */
-    
-    my_rank = MPI_Comm_rank();  // pega pega o numero do processo atual (rank)
+    int *vetor;
+        vetor = (int *)malloc(sizeof(int) * ARRAY_SIZE);
 
-    // recebo vetor
+    int size;
+    int newsize;
+
+    double t1,t2;
+    t1 = MPI_Wtime();  // inicia a contagem do tempo
 
     if ( my_rank == 0 ) // NODO PAI
     {
-        //tam_vetor = VETOR_SIZE;               // defino tamanho inicial do vetor
-        //Inicializa ( vetor, tam_vetor );      // sou a raiz e portanto gero o vetor - ordem reversa
-
-        int *vetor;
-        vetor = (int *)malloc(sizeof(int) * ARRAY_SIZE);
+        // printf("RAIZ\n");
 
         /*preenche vetor */
         int i;
-        for (i=0 ; i<ARRAY_SIZE; i++)              
+        for (i=0 ; i<ARRAY_SIZE; i++){
             vetor[i] = ARRAY_SIZE-i;
+            // printf("[%d]\n",vetor[i]);
+        }
+        printf("Primeiro [%d]\n",vetor[0]);
+        size = ARRAY_SIZE;
+        newsize = ARRAY_SIZE/2;
+
+        /* Divide o vetor para seus dois filhos, se existirem */
+        if(proc_n > filhoDireita){
+            MPI_Send(&vetor[0], newsize, MPI_INT, filhoDireita, 1, MPI_COMM_WORLD);
+        }
+        if(proc_n > filhoEsquerda){
+            MPI_Send(&vetor[size/2], newsize, MPI_INT, filhoEsquerda, 1, MPI_COMM_WORLD);
+        }
+
+        /* Aguarda a resposta dos filhos */
+        if(proc_n > filhoDireita) MPI_Recv(&vetor[0], newsize, MPI_INT, filhoDireita, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
+        if(proc_n > filhoEsquerda) MPI_Recv(&vetor[size/2], newsize, MPI_INT, filhoEsquerda, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
+        
+        /* Merge do vetor */
+        vetor = interleaving(vetor,size);
 
     }
     else // NODO FILHO
@@ -45,16 +104,16 @@ int main(int argc, char** argv){
         int mysource = (my_rank-1)/2;
 
         /* Instancia vetor */
-        int *vetor;
-        vetor = (int *)malloc(sizeof(int) * ARRAY_SIZE);
+        
+        // printf("Filho %d\n",my_rank);
 
         /* Espero uma parte do vetor para ordenar */
         MPI_Recv(vetor, ARRAY_SIZE , MPI_INT, mysource, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
-        int size = MPI_Get_count(&Status, MPI_INT, &tam_vetor);  // descubro tamanho da mensagem recebida
+        MPI_Get_count(&status, MPI_INT, &size);  // descubro tamanho da mensagem recebida
         
         /* Pego o rank e a tag de quem me enviou */
         int source = status.MPI_SOURCE;
-        int tag - status.MPI_TAG;
+        int tag = status.MPI_TAG;
 
         /* Se eu recebi uma msg de suicidio */
         if(tag == 0){
@@ -65,71 +124,47 @@ int main(int argc, char** argv){
         if(size <= delta){ //Conquista
             /* Ordena o vetor */
             bs(size, vetor);
-        }else{
+        }else{ //Divide
 
-            int newsize = size/2;
-
-            int filhoDireita = (my_rank*2)+1;
-            int filhoEsquerda = (my_rank*2)+2
-            
+            newsize = size/2;
+            // printf("Filho %d Dividindo\n",my_rank);
             /* Divide o vetor para seus dois filhos, se existirem */
             if(proc_n > filhoDireita){
-                MPI_Send(&vetor[0], newsize, MPI_INT, (my_rank*2)+1, 2, MPI_COMM_WORLD);
+                MPI_Send(&vetor[0], newsize, MPI_INT, filhoDireita, 1, MPI_COMM_WORLD);
             }
             if(proc_n > filhoEsquerda){
-                MPI_Send(&vetor[size/2], newsize, MPI_INT, (my_rank*2)+2, 2, MPI_COMM_WORLD);
+                MPI_Send(&vetor[size/2], newsize, MPI_INT, filhoEsquerda, 1, MPI_COMM_WORLD);
             }
 
-            /* Aguarda a resposta dos filhos */
-            if(proc_n > (my_rank*2)+1) MPI_Recv(&vetor[0], newsize, MPI_INT, (my_rank*2)+1, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
-            if(proc_n > (my_rank*2)+2) MPI_Recv(&vetor[size/2], newsize, MPI_INT, (my_rank*2)+2, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
             
-            /* junta vetores */
-            int y;
-            for (y=0 ; y<size/2; y++)              
-                vetor[y] = vetor_aux1[y];
-            int j;
-            for (j=(size/2) ; j<size; j++)              
-                vetor[j] = vetor_aux2[j-(size/2)];
-				
-			/* Merge do vetor */
+            /* Aguarda a resposta dos filhos */
+            if(proc_n > filhoDireita) MPI_Recv(&vetor[0], newsize, MPI_INT, filhoDireita, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
+            if(proc_n > filhoEsquerda) MPI_Recv(&vetor[size/2], newsize, MPI_INT, filhoEsquerda, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
+            
+            /* Merge do vetor */
             vetor = interleaving(vetor,size);
 
 
+
         }
-
-
-
-
+        // printf("Filho %d Respondendo\n",my_rank);
+        MPI_Send(vetor, size, MPI_INT, source, 1, MPI_COMM_WORLD);
     }
 
-    // dividir ou conquistar?
-
-    if ( tam_vetor <= delta ){
-        BubbleSort (vetor);  // conquisto
-    }else{
-        // dividir
-        // quebrar em duas partes e mandar para os filhos
-
-        MPI_Send ( &vetor[0], filho esquerda, tam_vetor/2 );  // mando metade inicial do vetor
-        MPI_Send ( &vetor[tam_vetor/2], filho direita , tam_vetor/2 );  // mando metade final
-
-        // receber dos filhos
-
-        MPI_Recv ( &vetor[0], filho esquerda);            
-        MPI_Recv ( &vetor[tam_vetor/2], filho direita);   
-
-        // intercalo vetor inteiro
     
-        Intercala ( vetor );
-    }
 
-    // mando para o pai
+    if(my_rank==0){
+    int y;
+    // for (y=0 ; y<ARRAY_SIZE; y++)              
+    //     printf("[%d]\n",vetor[y]);
+    printf("Primeiro ordenado [%d]\n",vetor[0]);
+    t2 = MPI_Wtime();
+    printf("\nTempo de execucao: %f\n\n", t2-t1);
+     }
 
-    if ( my_rank !=0 )
-        MPI_Send ( vetor, pai, tam_vetor );  // tenho pai, retorno vetor ordenado pra ele
-    else
-        Mostra ( vetor );                    // sou o raiz, mostro vetor
+    
+
+    
 
     MPI_Finalize();
 }
