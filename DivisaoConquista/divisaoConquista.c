@@ -21,7 +21,6 @@ int *interleaving(int vetor[], int tam)
         else
             vetor_auxiliar[i_aux] = vetor[i2++];
     }
-
     return vetor_auxiliar;
 }
 
@@ -42,9 +41,7 @@ void bs(int n, int * vetor)
             }
         c++;
     }
-    // printf("Ordenado.\n\n");
 }
-
 
 int main(int argc, char** argv){
 
@@ -70,13 +67,11 @@ int main(int argc, char** argv){
 
     if ( my_rank == 0 ) // NODO PAI
     {
-        // printf("RAIZ\n");
 
         /*preenche vetor */
         int i;
         for (i=0 ; i<ARRAY_SIZE; i++){
             vetor[i] = ARRAY_SIZE-i;
-            // printf("[%d]\n",vetor[i]);
         }
         printf("Primeiro [%d]\n",vetor[0]);
         size = ARRAY_SIZE;
@@ -103,10 +98,6 @@ int main(int argc, char** argv){
         /* Descubro quem vai me enviar (pai) calculando pelo meu rank */
         int mysource = (my_rank-1)/2;
 
-        /* Instancia vetor */
-        
-        // printf("Filho %d\n",my_rank);
-
         /* Espero uma parte do vetor para ordenar */
         MPI_Recv(vetor, ARRAY_SIZE , MPI_INT, mysource, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
         MPI_Get_count(&status, MPI_INT, &size);  // descubro tamanho da mensagem recebida
@@ -127,7 +118,7 @@ int main(int argc, char** argv){
         }else{ //Divide
 
             newsize = size/2;
-            // printf("Filho %d Dividindo\n",my_rank);
+            
             /* Divide o vetor para seus dois filhos, se existirem */
             if(proc_n > filhoDireita){
                 MPI_Send(&vetor[0], newsize, MPI_INT, filhoDireita, 1, MPI_COMM_WORLD);
@@ -135,7 +126,6 @@ int main(int argc, char** argv){
             if(proc_n > filhoEsquerda){
                 MPI_Send(&vetor[size/2], newsize, MPI_INT, filhoEsquerda, 1, MPI_COMM_WORLD);
             }
-
             
             /* Aguarda a resposta dos filhos */
             if(proc_n > filhoDireita) MPI_Recv(&vetor[0], newsize, MPI_INT, filhoDireita, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
@@ -144,27 +134,17 @@ int main(int argc, char** argv){
             /* Merge do vetor */
             vetor = interleaving(vetor,size);
 
-
-
         }
-        // printf("Filho %d Respondendo\n",my_rank);
+        /* Envia de volta para o pai */
         MPI_Send(vetor, size, MPI_INT, source, 1, MPI_COMM_WORLD);
     }
 
-    
-
     if(my_rank==0){
-    int y;
-    // for (y=0 ; y<ARRAY_SIZE; y++)              
-    //     printf("[%d]\n",vetor[y]);
-    printf("Primeiro ordenado [%d]\n",vetor[0]);
-    t2 = MPI_Wtime();
-    printf("\nTempo de execucao: %f\n\n", t2-t1);
-     }
-
-    
-
-    
+        
+        printf("Primeiro ordenado [%d]\n",vetor[0]);
+        t2 = MPI_Wtime();
+        printf("\nTempo de execucao: %f\n\n", t2-t1);
+    }
 
     MPI_Finalize();
 }
