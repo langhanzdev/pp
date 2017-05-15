@@ -64,6 +64,7 @@ int main(int argc, char** argv){
     int newsize;
     int localsize;
     int pos1, pos2;
+    int par;
 
     double t1,t2;
     t1 = MPI_Wtime();  // inicia a contagem do tempo
@@ -78,28 +79,30 @@ int main(int argc, char** argv){
         }
         printf("Primeiro [%d]\n",vetor[0]);
         size = ARRAY_SIZE;
-        localsize = ARRAY_SIZE/proc_n;
+        localsize = ARRAY_SIZE/10;
         newsize = (size-localsize)/2;
         pos1 = 0+localsize;
         pos2 = (size/2)+(localsize/2);
-
+        par = (int)(newsize%2);
         printf("tamanho local %d\n",localsize);
         printf("segunda posicao %d\n",pos2);
         printf("new size %d\n",newsize);
+        printf("par %d\n",par);
 
         /* Divide o vetor para seus dois filhos, se existirem */
         if(proc_n > filhoDireita){
             MPI_Send(&vetor[pos1], newsize, MPI_INT, filhoDireita, 1, MPI_COMM_WORLD);
         }
         if(proc_n > filhoEsquerda){
-            MPI_Send(&vetor[pos2], newsize, MPI_INT, filhoEsquerda, 1, MPI_COMM_WORLD);
+            MPI_Send(&vetor[pos2], newsize+par, MPI_INT, filhoEsquerda, 1, MPI_COMM_WORLD);
         }
 
-        // bs(localsize,vetor);
+        bs(localsize,vetor);
 
         /* Aguarda a resposta dos filhos */
         if(proc_n > filhoDireita) MPI_Recv(&vetor[pos1], newsize, MPI_INT, filhoDireita, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
-        if(proc_n > filhoEsquerda) MPI_Recv(&vetor[pos2], newsize, MPI_INT, filhoEsquerda, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
+        
+        if(proc_n > filhoEsquerda) MPI_Recv(&vetor[pos2], newsize+par, MPI_INT, filhoEsquerda, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
         
         /* Merge do vetor */
         vetor = interleaving(vetor,size);
@@ -129,25 +132,28 @@ int main(int argc, char** argv){
             bs(size, vetor);
         }else{ //Divide
 
-            localsize = ARRAY_SIZE/proc_n;
+            localsize = ARRAY_SIZE/10;
             newsize = (size-localsize)/2;
             pos1 = 0+localsize;
             pos2 = (size/2)+(localsize/2);
+            par = (int)(newsize%2);
             
             /* Divide o vetor para seus dois filhos, se existirem */
             if(proc_n > filhoDireita){
                 MPI_Send(&vetor[pos1], newsize, MPI_INT, filhoDireita, 1, MPI_COMM_WORLD);
             }
             if(proc_n > filhoEsquerda){
-                MPI_Send(&vetor[pos2], newsize, MPI_INT, filhoEsquerda, 1, MPI_COMM_WORLD);
+                MPI_Send(&vetor[pos2], newsize+par, MPI_INT, filhoEsquerda, 1, MPI_COMM_WORLD);
             }
+
+            bs(localsize,vetor);
             
             /* Aguarda a resposta dos filhos */
             if(proc_n > filhoDireita) MPI_Recv(&vetor[pos1], newsize, MPI_INT, filhoDireita, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
-            if(proc_n > filhoEsquerda) MPI_Recv(&vetor[pos2], newsize, MPI_INT, filhoEsquerda, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
+            vetor = interleaving(vetor,size-(newsize+par));
+            if(proc_n > filhoEsquerda) MPI_Recv(&vetor[pos2], newsize+par, MPI_INT, filhoEsquerda, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
             
             /* Merge do vetor */
-            vetor = interleaving(vetor,size);
             vetor = interleaving(vetor,size);
 
         }
