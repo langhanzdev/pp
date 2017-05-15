@@ -5,6 +5,25 @@
 
 //#define ARRAY_SIZE 100000
 
+int *interleavingParcial(int vetor[], int tam,int tam2)
+{
+    int *vetor_auxiliar;
+    int i1, i2, i_aux;
+
+    vetor_auxiliar = (int *)malloc(sizeof(int) * tam);
+
+    i1 = 0;
+    i2 = tam2;
+
+    for (i_aux = 0; i_aux < tam; i_aux++) {
+        if (((vetor[i1] <= vetor[i2]) && (i1 < tam2-1)) || (i2 == tam))
+            vetor_auxiliar[i_aux] = vetor[i1++];
+        else
+            vetor_auxiliar[i_aux] = vetor[i2++];
+    }
+    return vetor_auxiliar;
+}
+
 int *interleaving(int vetor[], int tam)
 {
     int *vetor_auxiliar;
@@ -97,11 +116,11 @@ int main(int argc, char** argv){
             MPI_Send(&vetor[pos2], newsize+par, MPI_INT, filhoEsquerda, 1, MPI_COMM_WORLD);
         }
 
-        bs(localsize,vetor);
+        bs(localsize,vetor);printf("inter %d\n",size-newsize);
 
         /* Aguarda a resposta dos filhos */
         if(proc_n > filhoDireita) MPI_Recv(&vetor[pos1], newsize, MPI_INT, filhoDireita, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
-        
+         vetor = interleavingParcial(vetor,size,localsize);
         if(proc_n > filhoEsquerda) MPI_Recv(&vetor[pos2], newsize+par, MPI_INT, filhoEsquerda, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
         
         /* Merge do vetor */
@@ -127,12 +146,12 @@ int main(int argc, char** argv){
 			MPI_Finalize();
 		}
 
-        if(size <= delta){ //Conquista
+        if(!(proc_n > filhoDireita)){//size <= delta){ //Conquista
             /* Ordena o vetor */
             bs(size, vetor);
         }else{ //Divide
 
-            localsize = ARRAY_SIZE/10;
+            localsize = size/10;
             newsize = (size-localsize)/2;
             pos1 = 0+localsize;
             pos2 = (size/2)+(localsize/2);
@@ -150,7 +169,7 @@ int main(int argc, char** argv){
             
             /* Aguarda a resposta dos filhos */
             if(proc_n > filhoDireita) MPI_Recv(&vetor[pos1], newsize, MPI_INT, filhoDireita, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
-            vetor = interleaving(vetor,size-(newsize+par));
+            vetor = interleavingParcial(vetor,size,localsize);
             if(proc_n > filhoEsquerda) MPI_Recv(&vetor[pos2], newsize+par, MPI_INT, filhoEsquerda, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
             
             /* Merge do vetor */
