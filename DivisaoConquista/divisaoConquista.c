@@ -3,7 +3,7 @@
 #include <string.h>
 #include "mpi.h"
 
-#define ARRAY_SIZE 100000
+//#define ARRAY_SIZE 100000
 
 int *interleaving(int vetor[], int tam)
 {
@@ -46,7 +46,8 @@ void bs(int n, int * vetor)
 int main(int argc, char** argv){
 
     int my_rank;       
-    int proc_n;        
+    int proc_n;     
+    int ARRAY_SIZE = atoi(argv[1]);   
     MPI_Status status; 
     MPI_Init(&argc,&argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
