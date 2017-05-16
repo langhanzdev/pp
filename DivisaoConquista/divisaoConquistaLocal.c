@@ -4,6 +4,7 @@
 #include "mpi.h"
 
 //#define ARRAY_SIZE 100000
+//#define PERCENT 10
 
 int *interleavingParcial(int vetor[], int tam,int tam2)
 {
@@ -16,7 +17,7 @@ int *interleavingParcial(int vetor[], int tam,int tam2)
     i2 = tam2;
 
     for (i_aux = 0; i_aux < tam; i_aux++) {
-        if (((vetor[i1] <= vetor[i2]) && (i1 < tam2-1)) || (i2 == tam))
+        if (((vetor[i1] <= vetor[i2]) && (i1 < tam2)) || (i2 == tam))
             vetor_auxiliar[i_aux] = vetor[i1++];
         else
             vetor_auxiliar[i_aux] = vetor[i2++];
@@ -66,7 +67,8 @@ int main(int argc, char** argv){
 
     int my_rank;       
     int proc_n;     
-    int ARRAY_SIZE = atoi(argv[1]);   
+    int ARRAY_SIZE = atoi(argv[1]);
+    int PERCENT = atoi(argv[2]);   
     MPI_Status status; 
     MPI_Init(&argc,&argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
@@ -97,16 +99,14 @@ int main(int argc, char** argv){
             vetor[i] = ARRAY_SIZE-i;
         }
         printf("Primeiro [%d]\n",vetor[0]);
+        
+        /* Variaveis de Controle */
         size = ARRAY_SIZE;
-        localsize = ARRAY_SIZE/10;
+        localsize = ARRAY_SIZE/PERCENT;
         newsize = (size-localsize)/2;
         pos1 = 0+localsize;
         pos2 = (size/2)+(localsize/2);
         par = (int)(newsize%2);
-        printf("tamanho local %d\n",localsize);
-        printf("segunda posicao %d\n",pos2);
-        printf("new size %d\n",newsize);
-        printf("par %d\n",par);
 
         /* Divide o vetor para seus dois filhos, se existirem */
         if(proc_n > filhoDireita){
@@ -116,15 +116,19 @@ int main(int argc, char** argv){
             MPI_Send(&vetor[pos2], newsize+par, MPI_INT, filhoEsquerda, 1, MPI_COMM_WORLD);
         }
 
-        bs(localsize,vetor);printf("inter %d\n",size-newsize);
+        /* Ordena porcentagem local */
+        bs(localsize,vetor);
 
         /* Aguarda a resposta dos filhos */
         if(proc_n > filhoDireita) MPI_Recv(&vetor[pos1], newsize, MPI_INT, filhoDireita, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
-         vetor = interleavingParcial(vetor,size,localsize);
-        if(proc_n > filhoEsquerda) MPI_Recv(&vetor[pos2], newsize+par, MPI_INT, filhoEsquerda, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
+        
+        /* intercala a ordenação local com a recebida do filho */
+        vetor = interleavingParcial(vetor,size,localsize);
+         
+        if(proc_n > filhoEsquerda) MPI_Recv(&vetor[pos2-localsize], newsize+par, MPI_INT, filhoEsquerda, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
         
         /* Merge do vetor */
-        vetor = interleaving(vetor,size);
+        vetor = interleavingParcial(vetor,size,newsize);
 
     }
     else // NODO FILHO
@@ -151,7 +155,8 @@ int main(int argc, char** argv){
             bs(size, vetor);
         }else{ //Divide
 
-            localsize = size/10;
+            /* Variaveis de controle */
+            localsize = size/PERCENT;
             newsize = (size-localsize)/2;
             pos1 = 0+localsize;
             pos2 = (size/2)+(localsize/2);
@@ -165,15 +170,19 @@ int main(int argc, char** argv){
                 MPI_Send(&vetor[pos2], newsize+par, MPI_INT, filhoEsquerda, 1, MPI_COMM_WORLD);
             }
 
+            /* Ordena porcentagem local */
             bs(localsize,vetor);
             
             /* Aguarda a resposta dos filhos */
             if(proc_n > filhoDireita) MPI_Recv(&vetor[pos1], newsize, MPI_INT, filhoDireita, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
+            
+            /* Intervacala local com o recebido do filho */
             vetor = interleavingParcial(vetor,size,localsize);
-            if(proc_n > filhoEsquerda) MPI_Recv(&vetor[pos2], newsize+par, MPI_INT, filhoEsquerda, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
+            
+            if(proc_n > filhoEsquerda) MPI_Recv(&vetor[pos2-localsize], newsize+par, MPI_INT, filhoEsquerda, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
             
             /* Merge do vetor */
-            vetor = interleaving(vetor,size);
+            vetor = interleavingParcial(vetor,size,newsize);
 
         }
         /* Envia de volta para o pai */
@@ -183,10 +192,6 @@ int main(int argc, char** argv){
     if(my_rank==0){
         
         printf("Primeiro ordenado [%d]\n",vetor[0]);
-        int abc;
-        for(abc=0;abc<ARRAY_SIZE;abc++){
-            printf("%d -> [%d]\n",abc,vetor[abc]);
-        }
         t2 = MPI_Wtime();
         printf("\nTempo de execucao: %f\n\n", t2-t1);
     }
