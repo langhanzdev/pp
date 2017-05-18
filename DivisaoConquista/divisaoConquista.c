@@ -78,21 +78,25 @@ int main(int argc, char** argv){
         size = ARRAY_SIZE;
         newsize = ARRAY_SIZE/2;
 
-        /* Divide o vetor para seus dois filhos, se existirem */
-        if(proc_n > filhoDireita){
-            MPI_Send(&vetor[0], newsize, MPI_INT, filhoDireita, 1, MPI_COMM_WORLD);
-        }
-        if(proc_n > filhoEsquerda){
-            MPI_Send(&vetor[size/2], newsize, MPI_INT, filhoEsquerda, 1, MPI_COMM_WORLD);
-        }
+        if(proc_n == 1){
+            bs(size, vetor);
+        }else{
 
-        /* Aguarda a resposta dos filhos */
-        if(proc_n > filhoDireita) MPI_Recv(&vetor[0], newsize, MPI_INT, filhoDireita, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
-        if(proc_n > filhoEsquerda) MPI_Recv(&vetor[size/2], newsize, MPI_INT, filhoEsquerda, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
-        
-        /* Merge do vetor */
-        vetor = interleaving(vetor,size);
+            /* Divide o vetor para seus dois filhos, se existirem */
+            if(proc_n > filhoDireita){
+                MPI_Send(&vetor[0], newsize, MPI_INT, filhoDireita, 1, MPI_COMM_WORLD);
+            }
+            if(proc_n > filhoEsquerda){
+                MPI_Send(&vetor[size/2], newsize, MPI_INT, filhoEsquerda, 1, MPI_COMM_WORLD);
+            }
 
+            /* Aguarda a resposta dos filhos */
+            if(proc_n > filhoDireita) MPI_Recv(&vetor[0], newsize, MPI_INT, filhoDireita, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
+            if(proc_n > filhoEsquerda) MPI_Recv(&vetor[size/2], newsize, MPI_INT, filhoEsquerda, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
+            
+            /* Merge do vetor */
+            vetor = interleaving(vetor,size);
+        }
     }
     else // NODO FILHO
     {
